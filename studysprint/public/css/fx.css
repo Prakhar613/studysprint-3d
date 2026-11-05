@@ -1,0 +1,170 @@
+/* Animated atmosphere, cursor effects, hover effects, language toggle.
+   The background is generated live (CSS + canvas), not a video file, so it stays sharp at any size and costs no bandwidth. */
+
+/* ---- cinematic background: drifting light, rays, color depth ---- */
+#atmos{overflow:hidden}
+#atmos .rays{position:absolute;left:50%;top:-34%;width:170vmax;height:170vmax;margin-left:-85vmax;opacity:.55;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,rgb(var(--a1) / .06) 0deg 3deg,transparent 3deg 14deg);
+  -webkit-mask:radial-gradient(closest-side,#000 4%,transparent 68%);mask:radial-gradient(closest-side,#000 4%,transparent 68%);
+  animation:spin 170s linear infinite;will-change:transform}
+.blob{position:absolute;width:62vmax;height:62vmax;border-radius:50%;pointer-events:none;
+  transform:translate3d(calc(var(--px,0)*var(--k,20)*1px),calc(var(--py,0)*var(--k,20)*1px),0);transition:transform 1.4s var(--ease);will-change:transform}
+.blob::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,var(--bc) 0%,transparent 62%);
+  animation:drift var(--dur,48s) ease-in-out infinite alternate;will-change:transform}
+.b1{--bc:rgb(var(--a2) / .22);--k:26;left:-20vmax;top:-24vmax}
+.b2{--bc:rgb(var(--a3) / .17);--k:-34;--dur:62s;right:-26vmax;top:16vh}
+.b3{--bc:rgb(var(--a1) / .13);--k:18;--dur:54s;left:20vw;bottom:-38vmax}
+.b4{--bc:rgba(52,120,134,.13);--k:-22;--dur:70s;left:52vw;top:-34vmax}
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(6vmax,4vmax,0) scale(1.14)}100%{transform:translate3d(-4vmax,8vmax,0) scale(.94)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- cursor ring + soft light that follows the pointer ---- */
+#cur,#glow{position:fixed;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .5s}
+body.has-cursor #cur,body.has-cursor #glow{opacity:1}
+#glow{width:520px;height:520px;z-index:-1;background:radial-gradient(circle,rgb(var(--a2) / .11),transparent 62%)}
+#cur{z-index:60;width:34px;height:34px;border-radius:50%;border:1px solid rgb(var(--a1) / .55);
+  transition:opacity .5s,width .35s var(--ease),height .35s var(--ease),background .3s,border-color .3s,border-radius .3s}
+#cur[data-s=link]{width:64px;height:64px;background:rgb(var(--a1) / .1);border-color:rgb(var(--a1) / .95)}
+#cur[data-s=text]{width:3px;height:28px;border-radius:3px;background:var(--amber);border-color:transparent}
+#cur.down{width:22px;height:22px;background:rgb(var(--a1) / .25)}
+@media(hover:none),(pointer:coarse){#cur,#glow{display:none}}
+
+/* ---- spotlight: a light follows the pointer across any card, button or option ---- */
+:is(.panel,.stat,.cc,.layer,.sheet,.opt,.subj button,.nums>div,.rooms,.pane){position:relative}
+:is(.panel,.stat,.cc,.layer,.sheet,.opt,.subj button,.nums>div,.rooms,.pane)::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .4s;
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,50%),rgb(var(--a1) / .14),transparent 62%)}
+:is(.panel,.stat,.cc,.layer,.sheet,.opt,.subj button,.nums>div,.rooms,.pane):hover::after{opacity:1}
+.opt,.subj button{overflow:hidden}
+.btn,.chip{position:relative;overflow:hidden}
+.btn::after,.chip::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:radial-gradient(120px circle at var(--mx,50%) var(--my,50%),rgba(255,236,205,.26),transparent 65%)}
+.btn.primary::after{background:radial-gradient(130px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.45),transparent 65%)}
+.btn:hover::after,.chip:hover::after{opacity:1}
+.chip[aria-pressed=true]::after{display:none}
+
+/* ---- 3D tilt (JS sets the transform, this only tunes the feel) ---- */
+.tilting{transition:transform .14s ease-out,border-color .3s,box-shadow .3s!important;will-change:transform}
+.cc:hover,.cc.tilting{box-shadow:0 30px 60px -34px rgb(var(--a2) / .5)}
+
+/* ---- click ripple ---- */
+.ripple{position:absolute;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,rgb(var(--a1) / .55),rgb(var(--a2) / .2) 55%,transparent 70%);
+  transform:translate(-50%,-50%) scale(0);animation:ripple .75s ease-out forwards}
+@keyframes ripple{to{transform:translate(-50%,-50%) scale(1);opacity:0}}
+
+/* ---- more hover polish ---- */
+.nav a{position:relative}
+.nav a::before{content:"";position:absolute;left:.8rem;right:.8rem;bottom:-1px;height:2px;background:var(--amber);transform:scaleX(0);transform-origin:left;transition:transform .45s var(--ease);box-shadow:0 0 12px var(--amber)}
+.nav a:hover::before{transform:scaleX(1)}
+.nav a[aria-current=page]::before{display:none}
+.brand:hover .brand-dot{transform:scale(1.35)}
+.brand-dot{transition:transform .4s var(--ease)}
+.news a strong{background:linear-gradient(var(--amber),var(--amber)) 0 100%/0 1px no-repeat;transition:background-size .5s var(--ease),color .25s}
+.news a:hover strong{background-size:100% 1px}
+.rules li{transition:padding-left .45s var(--ease),background .45s}
+.rules li:hover{padding-left:.8rem;background:linear-gradient(90deg,rgb(var(--a1) / .07),transparent)}
+.board li{transition:padding-left .35s var(--ease),background .35s}
+.board li:hover{padding-left:.6rem;background:linear-gradient(90deg,rgb(var(--a1) / .07),transparent)}
+.layer .name{transition:letter-spacing .5s var(--ease),color .3s}
+.layer:hover .name{color:#fff}
+.layer .n{transition:color .3s}
+.layer:hover .n{color:var(--c)}
+
+/* ---- language toggle ---- */
+.lang{position:relative;display:inline-grid;grid-template-columns:1fr 1fr;align-items:center;min-width:88px;height:36px;padding:3px;border-radius:99px;
+  border:1px solid var(--line-2);background:rgba(255,255,255,.04);color:var(--ink-3);cursor:pointer;font:600 .78rem var(--mono);transition:border-color .3s}
+.lang:hover{border-color:rgb(var(--a1) / .6)}
+.lang span{position:relative;z-index:1;text-align:center;transition:color .35s}
+.lang i{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:99px;background:linear-gradient(135deg,var(--amber),var(--ember));
+  box-shadow:0 0 18px -2px rgb(var(--a2) / .75);transition:transform .5s var(--ease)}
+html:not([lang=hi]) .lang span:first-of-type,html[lang=hi] .lang span:last-of-type{color:var(--accent-ink)}
+html[lang=hi] .lang i{transform:translateX(100%)}
+
+/* ---- Hindi typography: no tracking, no italics, Devanagari-friendly line height ---- */
+html[lang=hi] body *{letter-spacing:normal}
+html[lang=hi] em{font-style:normal}
+html[lang=hi] :is(h1,h2,h3,.display,.statement,.qtext,.stat b,.nums b,.rules strong,.cc strong,.news strong,.name,.subj strong,.brand,#hud .read b){
+  font-family:"Noto Serif Devanagari","Tiro Devanagari Hindi","Mukta","Kohinoor Devanagari",var(--serif);line-height:1.25}
+html[lang=hi] .display{line-height:1.14}
+html[lang=hi] .statement{line-height:1.18}
+html[lang=hi] :is(.nav a,.chip,.eyebrow,label,.phase,.chap-n,.cue,#hud,.badge,th){text-transform:none}
+
+html[lang=hi] .display{font-size:clamp(2.5rem,6.2vw,4.8rem)}
+html[lang=hi] :is(.nav a,.chip,label,.phase,.stat span,.qmeta,.hero-meta,.cc .when,.layer .q,.board .r,.btn){font-family:var(--sans)}
+html[lang=hi] .nav a{font-size:.95rem}
+html[lang=hi] :is(.eyebrow,.phase,label,.chip,.hero-meta){font-size:.95rem}
+html[lang=hi] :is(.chap-n,.cue,#hud,.stat span,.layer .q,.cc .when){font-size:.88rem}
+html[lang=hi] .rules strong{font-size:1.4rem}
+html[lang=hi] .btn{font-weight:600}
+
+.btn{white-space:nowrap}
+@media(max-width:760px){
+  .top-in{gap:.5rem;padding:.55rem 14px}
+  .brand{font-size:1.25rem}
+  .lang{min-width:76px;height:32px}
+}
+@media(max-width:520px){
+  .top-in{gap:.4rem;padding:.5rem 12px}
+  .brand{font-size:1.05rem;gap:.4rem}
+  .brand-dot{width:.75rem;height:.75rem}
+  .userbox{gap:.3rem}
+  .userbox .btn.small{padding:.25rem .65rem;font-size:.8rem;min-height:34px}
+  .lang{min-width:64px;height:30px;font-size:.7rem}
+  .nav a{padding:.55rem .65rem}
+}
+@media(prefers-reduced-motion:reduce){
+  #atmos .rays,.blob::before{animation:none}
+  .blob{transition:none}
+}
+
+/* =====================================================================
+   COLOUR THEMES: ember (default, set in app.css), aurora (green), nebula (violet).
+   The 3D scene reads the same names in js/scene3d.js (THEMES).
+   ===================================================================== */
+html[data-theme=aurora]{--a1:125 255 178;--a2:47 224 138;--a3:15 159 106;--a-hot:212 255 233;
+  --bg-rgb:5 12 9;--bg2-rgb:8 17 13;--bg3-rgb:6 22 16;--s-rgb:13 26 21;--s2-rgb:20 40 32;--ink-on-accent:#04150c}
+html[data-theme=nebula]{--a1:178 160 255;--a2:143 107 255;--a3:84 58 220;--a-hot:230 220 255;
+  --bg-rgb:8 6 17;--bg2-rgb:11 9 24;--bg3-rgb:16 10 36;--s-rgb:20 16 38;--s2-rgb:32 26 58;--ink-on-accent:#120a33}
+
+.themebtn{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);cursor:pointer;padding:0;position:relative;transition:transform .4s var(--ease),border-color .3s}
+.themebtn:hover{border-color:rgba(255,255,255,.6);transform:rotate(60deg)}
+html:not([data-theme]) .themebtn,html[data-theme=ember] .themebtn{background:conic-gradient(#ffd08a,#ff8a3d,#e5532d,#ffd08a)}
+html[data-theme=aurora] .themebtn{background:conic-gradient(#d4ffe9,#2fe08a,#0f9f6a,#d4ffe9)}
+html[data-theme=nebula] .themebtn{background:conic-gradient(#e6dcff,#8f6bff,#543adc,#e6dcff)}
+.foot-theme{display:none}
+
+/* =====================================================================
+   3D WORLD
+   ===================================================================== */
+#gl{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-2;display:none}
+html.gl #gl{display:block}
+html.gl #fx{display:none}
+html.gl #atmos .rays{opacity:.1}
+html.gl .blob{opacity:.5}
+#labels{position:fixed;inset:0;z-index:12;pointer-events:none}
+.plabel{position:absolute;left:0;top:0;display:grid;gap:.05rem;padding:.35rem .75rem;border-radius:12px;white-space:nowrap;text-decoration:none;color:var(--ink);
+  background:rgb(var(--s-rgb) / .74);border:1px solid var(--c,var(--amber));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  opacity:0;pointer-events:none;transition:box-shadow .3s,background .3s;will-change:transform,opacity}
+.plabel b{font:400 1.05rem/1.2 var(--serif)}
+.plabel span{font:500 .68rem var(--mono);letter-spacing:.06em;color:var(--ink-3)}
+.plabel.on{pointer-events:auto}
+.plabel.hot{box-shadow:0 0 26px -4px var(--c);background:rgb(var(--s2-rgb) / .9)}
+body.core-hover{cursor:grab}
+body.dragging,body.dragging *{cursor:grabbing!important;user-select:none}
+body[data-planet="1"]{cursor:pointer}
+.layer.hot{transform:translateX(10px);border-color:var(--c);box-shadow:0 0 0 1px var(--c),-12px 0 40px -18px var(--c)}
+.layer.hot .arrow{transform:translateX(5px)}
+.layer.hot .name{color:#fff}
+.layer.hot .n{color:var(--c)}
+.layer.hot::after{opacity:1}
+.hint{display:none}
+@media(hover:hover) and (pointer:fine){html.gl .hint{display:block;margin-top:.4rem;color:var(--amber)}}
+
+/* glass panels so text stays readable over the 3D scene */
+.panel,.cc,.nums{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+html.gl .chap .statement,html.gl .chap .eyebrow,html.gl .chap>.wrap>.reveal>p{text-shadow:0 2px 24px rgb(var(--bg-rgb) / .85)}
+
+@media(max-width:520px){
+  .top .themebtn{display:none}
+  .foot-theme{display:block}
+}

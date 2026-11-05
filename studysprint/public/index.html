@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudySprint India</title>
+<meta name="description" content="Pomodoro focus timer, timed subject quizzes, weekly contests, live chat and free books for students across India.">
+<meta name="theme-color" content="#0c0907">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/home.css">
+<link rel="stylesheet" href="/css/fx.css">
+</head>
+<body>
+<div id="atmos" aria-hidden="true"><i class="rays"></i><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div id="labels"></div>
+<div id="glow" aria-hidden="true"></div>
+<div id="cur" aria-hidden="true"></div>
+<aside id="hud" aria-hidden="true"></aside>
+<a class="skip" href="#app" data-i18n="skip">Skip to content</a>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#/" aria-label="StudySprint home"><span class="brand-dot" aria-hidden="true"></span>StudySprint</a>
+    <a id="pomo-pill" class="pill" href="#/focus" hidden></a>
+    <div id="userbox" class="userbox"></div>
+    <button type="button" id="lang" class="lang" aria-label="Switch language" data-i18n-label="lang.switch"><i></i><span>EN</span><span lang="hi">हिं</span></button>
+    <button type="button" class="themebtn js-theme" aria-label="Change colour theme" data-i18n-label="theme.switch"></button>
+  </div>
+  <nav class="nav" id="nav" aria-label="Main">
+    <a href="#/" data-r="" data-i18n="nav.home">Home</a>
+    <a href="#/focus" data-r="focus" data-i18n="nav.focus">Focus</a>
+    <a href="#/quiz" data-r="quiz" data-i18n="nav.quiz">Quiz</a>
+    <a href="#/contests" data-r="contest" data-i18n="nav.contests">Contests</a>
+    <a href="#/leaderboard" data-r="leaderboard" data-i18n="nav.leaderboard">Leaderboard</a>
+    <a href="#/chat" data-r="chat" data-i18n="nav.chat">Live chat</a>
+    <a href="#/doubts" data-r="doubts" data-i18n="nav.doubts">Doubts</a>
+    <a href="#/research" data-r="research" data-i18n="nav.research">Research</a>
+    <a href="#/library" data-r="library" data-i18n="nav.books">Books</a>
+  </nav>
+</header>
+<main id="app" tabindex="-1" aria-live="polite"></main>
+<footer class="foot">
+  <p data-i18n="foot.1">StudySprint is a free study tool. Use a nickname, never your real name, phone number or school. Be kind in chat.</p>
+  <p><span data-i18n="foot.a">Questions: built-in bank plus</span> <a href="https://opentdb.com" target="_blank" rel="noopener noreferrer">Open Trivia DB</a> <span data-i18n="foot.b">(CC BY-SA 4.0).</span> <span data-i18n="foot.c">Papers:</span> <a href="https://openalex.org" target="_blank" rel="noopener noreferrer">OpenAlex</a>. <span data-i18n="foot.d">Books:</span> <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>. <span data-i18n="foot.e">Headlines link to their publishers.</span></p>
+</footer>
+<div id="toasts" role="status" aria-live="polite"></div>
+<p class="foot-theme foot"><button type="button" class="btn small js-theme" data-i18n="theme.switch">Change colour theme</button></p>
+<noscript><p class="noscript">StudySprint needs JavaScript to run.</p></noscript>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "studysprint-india",
+  "version": "1.0.0",
+  "description": "Pomodoro study app for Indian students: timed quizzes, weekly contests, leaderboards, live chat, doubts forum, research and free-book links. Zero npm dependencies.",
+  "main": "server.js",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning test/run.js",
+    "import-questions": "node --disable-warning=ExperimentalWarning scripts/import-questions.js"
+  }
+}

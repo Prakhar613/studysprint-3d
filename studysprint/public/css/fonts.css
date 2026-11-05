@@ -1,0 +1,20 @@
+/* OPTIONAL: self-hosted fonts for the full cinematic look.
+ *
+ * StudySprint ships with elegant system-font fallbacks, so the site works without this file.
+ * To use the template typefaces (the CSP only allows fonts from your own domain, so they must be self-hosted):
+ *
+ *  1. Download these three families (all open-source, SIL OFL), latin subset, woff2 format,
+ *     for example from https://fontsource.org or https://gwfh.mranftl.com/fonts :
+ *       - DM Serif Display  (regular 400 + italic 400)
+ *       - Inter             (variable weight, or 400/500/600)
+ *       - JetBrains Mono    (variable weight, or 400/500/600)
+ *  2. Put the files in  public/fonts/  using the names below.
+ *  3. Add this line to public/index.html, right after the app.css link:
+ *       <link rel="stylesheet" href="/css/fonts.css">
+ *
+ * app.css already lists these families first in its font stacks, nothing else to change.
+ */
+@font-face{font-family:"DM Serif Display";font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/dm-serif-display-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"DM Serif Display";font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/dm-serif-display-latin-400-italic.woff2) format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/inter-latin-wght-normal.woff2) format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:100 800;font-display:swap;src:url(/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2")}
