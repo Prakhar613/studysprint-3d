@@ -26,6 +26,12 @@ function bump(userId) {
   if (usage.size > 5000) usage.delete(usage.keys().next().value);
 }
 
+/** A message that produced no answer (provider down, model retired...) must not use up the student's allowance. */
+function refund(userId) {
+  const u = usage.get(userId);
+  if (u && u.n > 0) u.n -= 1;
+}
+
 function pomodoroLine(p) {
   if (!p || typeof p !== 'object') return '';
   const phase = { focus: 'a focus session', short: 'a short break', long: 'a long break' }[p.phase];
@@ -97,9 +103,10 @@ function register(router) {
       });
       const send = (obj) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(obj)}\n\n`); };
 
+      let gotText = false;
       try {
         for await (const part of tutor.streamReply({ system, messages, signal })) {
-          if (part.text) send({ t: part.text });
+          if (part.text) { gotText = true; send({ t: part.text }); }
           else if (part.done) send({ done: true, truncated: part.truncated, left: Math.max(0, config.TUTOR_DAILY_LIMIT - usedToday(req.user.id)) });
         }
       } catch (e) {
@@ -109,6 +116,7 @@ function register(router) {
           send({ error: e instanceof tutor.TutorError ? e.message : 'Something went wrong. Please try again.' });
         }
       } finally {
+        if (!gotText) refund(req.user.id);
         inFlight.delete(req.user.id);
         res.end();
       }
