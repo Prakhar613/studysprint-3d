@@ -124,10 +124,10 @@ class TutorError extends Error {
 
 // Providers. "openai" format = the common Chat Completions API that Groq, Gemini and OpenRouter all speak.
 const PRESETS = {
-  groq: { format: 'openai', url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', keyVar: 'GROQ_API_KEY' },
-  gemini: { format: 'openai', url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: 'gemini-3.5-flash-lite', keyVar: 'GEMINI_API_KEY' },
-  openrouter: { format: 'openai', url: 'https://openrouter.ai/api/v1/chat/completions', model: 'openrouter/free', keyVar: 'OPENROUTER_API_KEY' },
-  anthropic: { format: 'anthropic', url: 'https://api.anthropic.com/v1/messages', model: 'claude-sonnet-5-5', keyVar: 'ANTHROPIC_API_KEY' },
+  groq: { format: 'openai', url: 'https://api.groq.com/openai/v1/chat/completions', models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'], keyVar: 'GROQ_API_KEY' },
+  gemini: { format: 'openai', url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', models: ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'], keyVar: 'GEMINI_API_KEY' },
+  openrouter: { format: 'openai', url: 'https://openrouter.ai/api/v1/chat/completions', models: ['openrouter/free'], keyVar: 'OPENROUTER_API_KEY' },
+  anthropic: { format: 'anthropic', url: 'https://api.anthropic.com/v1/messages', models: ['claude-sonnet-5-5'], keyVar: 'ANTHROPIC_API_KEY' },
 };
 const ORDER = ['groq', 'gemini', 'openrouter', 'anthropic'];
 
@@ -139,21 +139,23 @@ function resolve() {
   const p = PRESETS[name];
   const key = config.TUTOR_API_KEY || config[p.keyVar];
   if (!key) return null;
-  return { name, format: p.format, key, url: config.TUTOR_API_URL || p.url, model: config.TUTOR_MODEL || p.model };
+  // Free models get retired from time to time, so there is always a fallback list. TUTOR_MODEL can hold several names separated by commas.
+  const custom = config.TUTOR_MODEL.split(',').map((m) => m.trim()).filter(Boolean);
+  return { name, format: p.format, key, url: config.TUTOR_API_URL || p.url, models: custom.length ? custom : p.models };
 }
 const isEnabled = () => Boolean(resolve());
 
-function buildRequest(pv, system, messages) {
+function buildRequest(pv, model, system, messages) {
   if (pv.format === 'anthropic') {
     return {
       headers: { 'content-type': 'application/json', 'x-api-key': pv.key, 'anthropic-version': '2023-06-01' },
-      body: { model: pv.model, max_tokens: 900, stream: true, system, messages },
+      body: { model, max_tokens: 900, stream: true, system, messages },
     };
   }
-  return {
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${pv.key}` },
-    body: { model: pv.model, max_tokens: 900, stream: true, messages: [{ role: 'system', content: system }, ...messages] },
-  };
+  // Room for the model's own thinking as well as the answer; the system prompt keeps answers short.
+  const body = { model, max_tokens: 1500, stream: true, messages: [{ role: 'system', content: system }, ...messages] };
+  if (/gpt-oss/.test(model)) body.reasoning_effort = 'low'; // fast replies, and no tokens wasted on long thinking
+  return { headers: { 'content-type': 'application/json', authorization: `Bearer ${pv.key}` }, body };
 }
 
 /** Reads one parsed stream event; returns { text?, truncated?, error? }. */
@@ -180,19 +182,23 @@ function readEvent(format, ev) {
 async function* streamReply({ system, messages, signal }) {
   const pv = resolve();
   if (!pv) throw new TutorError('The AI tutor is not switched on for this site yet.', 503);
-  const rq = buildRequest(pv, system, messages);
   let res;
-  try {
-    res = await fetch(pv.url, { method: 'POST', signal, headers: rq.headers, body: JSON.stringify(rq.body) });
-  } catch (e) {
-    if (e.name === 'AbortError' || e.name === 'TimeoutError') throw e;
-    throw new TutorError('The tutor could not be reached. Please try again.');
-  }
-  if (!res.ok || !res.body) {
+  for (let i = 0; i < pv.models.length; i++) {
+    const rq = buildRequest(pv, pv.models[i], system, messages);
+    try {
+      res = await fetch(pv.url, { method: 'POST', signal, headers: rq.headers, body: JSON.stringify(rq.body) });
+    } catch (e) {
+      if (e.name === 'AbortError' || e.name === 'TimeoutError') throw e;
+      throw new TutorError('The tutor could not be reached. Please try again.');
+    }
+    if (res.ok && res.body) break;
     const detail = await res.text().catch(() => '');
-    console.error(`[tutor] ${pv.name} upstream`, res.status, detail.slice(0, 300));
+    console.error(`[tutor] ${pv.name} ${pv.models[i]} upstream`, res.status, detail.slice(0, 300));
+    const modelProblem = res.status === 400 || res.status === 404; // unknown, retired or unsupported model
+    if (modelProblem && i < pv.models.length - 1) continue; // try the next model in the list
     if (res.status === 401 || res.status === 403) throw new TutorError('The tutor is not set up correctly. Please tell the site owner.', 503);
     if (res.status === 429 || res.status === 529) throw new TutorError('The tutor is very busy right now. Try again in a minute.', 503);
+    if (modelProblem) throw new TutorError('The tutor\'s AI model is not available. Please tell the site owner.', 503);
     throw new TutorError('The tutor ran into a problem. Please try again.');
   }
   const reader = res.body.getReader();
