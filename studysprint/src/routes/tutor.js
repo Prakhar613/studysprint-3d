@@ -41,6 +41,12 @@ function pomodoroLine(p) {
 }
 
 function register(router) {
+  // One line at startup (visible in Render's Logs) so it is obvious whether the tutor found a key.
+  const pv = tutor.resolve();
+  console.log(pv
+    ? `[tutor] ON: provider ${pv.name}, models ${pv.models.join(', ')}`
+    : '[tutor] OFF: no API key found. Set GROQ_API_KEY (or GEMINI_API_KEY) in the environment and redeploy.');
+
   router.get('/api/tutor/status', (req, res) => {
     const limitN = config.TUTOR_DAILY_LIMIT;
     res.json({

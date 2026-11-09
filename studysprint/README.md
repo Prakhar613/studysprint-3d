@@ -36,13 +36,13 @@ Pick ONE provider and set its key as an environment variable (on Render: your se
 
 | Provider | Cost | Variable | Default model |
 |---|---|---|---|
-| Groq (recommended) | free tier, no card | `GROQ_API_KEY` (key from console.groq.com, API Keys) | `llama-3.3-70b-versatile` |
-| Google Gemini | free tier, no card, but small daily limits | `GEMINI_API_KEY` (key from aistudio.google.com) | `gemini-3.5-flash-lite` |
+| Groq (recommended) | free tier, no card | `GROQ_API_KEY` (key from console.groq.com, API Keys) | `openai/gpt-oss-120b`, then `openai/gpt-oss-20b` if the first is unavailable |
+| Google Gemini | free tier, no card, but small daily limits | `GEMINI_API_KEY` (key from aistudio.google.com) | `gemini-3.5-flash-lite`, then `gemini-3.1-flash-lite` |
 | OpenRouter | some free models | `OPENROUTER_API_KEY` | `openrouter/free` |
 | Anthropic Claude | paid | `ANTHROPIC_API_KEY` | `claude-sonnet-5-5` |
 
 - If several keys are set, the order above wins; force one with `TUTOR_PROVIDER` (`groq`, `gemini`, `openrouter` or `anthropic`).
-- `TUTOR_MODEL` overrides the model name (free model names change, so check the provider's model list if you get an error). `TUTOR_DAILY_LIMIT` is messages per student per IST day (default 40).
+- `TUTOR_MODEL` overrides the model; you can list several separated by commas and they are tried in order. Free models are retired regularly (Groq shut down `llama-3.3-70b-versatile` on 16 Aug 2026), so if the tutor says "model is not available" check the provider's current model list and set `TUTOR_MODEL` to a live name. `TUTOR_DAILY_LIMIT` is messages per student per IST day (default 40).
 - Free-tier limits and model names change. Check the provider's current limits page before a big launch.
 - Restart or redeploy after changing variables.
 

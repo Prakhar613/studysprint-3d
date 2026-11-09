@@ -485,6 +485,7 @@ describe('ai tutor', () => {
       req.on('end', () => {
         const body = JSON.parse(raw);
         seen.push({ headers: req.headers, body });
+        if (config.__mockBadModel && body.model === config.__mockBadModel) { res.writeHead(404); return res.end('{"error":"model not found"}'); }
         if (config.__mockStatus) { res.writeHead(config.__mockStatus); return res.end('{"error":"x"}'); }
         if (req.headers.authorization) { // OpenAI-style providers (Groq, Gemini, OpenRouter)
           res.writeHead(200, { 'Content-Type': 'text/event-stream' });
@@ -605,11 +606,13 @@ describe('ai tutor', () => {
     config.TUTOR_DAILY_LIMIT = old;
 
     const d = c;
+    const before = (await d('GET', '/api/tutor/status')).data.left;
     config.__mockStatus = 529;
     const res = await stream(d, { messages: [{ role: 'user', content: 'hello' }] });
     const out = await readAll(res);
     config.__mockStatus = 0;
     assert.match(out.error.error, /busy/);
+    assert.equal((await d('GET', '/api/tutor/status')).data.left, before); // failed attempts are not charged
 
     const e = c;
     config.__mockStop = 'max_tokens';
@@ -629,10 +632,19 @@ describe('ai tutor', () => {
     let up = seen[0];
     assert.equal(up.headers.authorization, 'Bearer gsk-test');
     assert.equal(up.headers['x-api-key'], undefined);
-    assert.equal(up.body.model, 'llama-3.3-70b-versatile');
+    assert.equal(up.body.model, 'openai/gpt-oss-120b');
+    assert.equal(up.body.reasoning_effort, 'low');
     assert.equal(up.body.messages[0].role, 'system');
     assert.match(up.body.messages[0].content, /Sprint/);
     assert.equal(up.body.messages[up.body.messages.length - 1].content, 'hi there');
+
+    // a retired model is skipped automatically in favour of the next one in the list
+    seen = [];
+    config.__mockBadModel = 'openai/gpt-oss-120b';
+    const fb = await readAll(await stream(c, { messages: [{ role: 'user', content: 'fallback please' }] }));
+    config.__mockBadModel = '';
+    assert.equal(fb.text, 'Hello **student**!');
+    assert.deepEqual(seen.map((x) => x.body.model), ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
 
     config.TUTOR_PROVIDER = 'gemini';
     config.GEMINI_API_KEY = 'g-test';

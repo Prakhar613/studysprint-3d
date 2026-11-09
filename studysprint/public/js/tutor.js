@@ -359,11 +359,11 @@ export function buildView({ page = false, onClose = null } = {}) {
     sendBtn.hidden = ctl.busy;
     stopBtn.hidden = !ctl.busy;
     sendBtn.disabled = false;
-    foot.replaceChildren(
+    foot.replaceChildren(...[
       ctl.error ? h('span', { class: 'err', role: 'alert' }, ctl.error) : null,
       state.user && s && s.enabled && typeof s.left === 'number' ? h('span', {}, t('tutor.left', { n: s.left })) : null,
       h('span', {}, t('tutor.note')),
-    );
+    ].filter(Boolean)); // replaceChildren turns null into the text "null", so empty slots must be dropped
     bottom.replaceChildren(main, foot);
   }
 
