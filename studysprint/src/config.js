@@ -25,5 +25,16 @@ module.exports = {
     .filter(Boolean),
   SYNC_QUESTIONS: process.env.SYNC_QUESTIONS !== 'false',
   CONTACT_EMAIL: process.env.CONTACT_EMAIL || '',
+  // AI tutor. Set ONE provider key to switch it on (leave all empty to switch it off; the rest of the site is unaffected).
+  // Free options: GROQ_API_KEY (recommended) or GEMINI_API_KEY. Also supported: OPENROUTER_API_KEY, ANTHROPIC_API_KEY.
+  GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+  TUTOR_PROVIDER: (process.env.TUTOR_PROVIDER || '').toLowerCase(), // groq | gemini | openrouter | anthropic (default: whichever key is set)
+  TUTOR_API_KEY: process.env.TUTOR_API_KEY || '', // optional: one generic key for the chosen provider
+  TUTOR_MODEL: process.env.TUTOR_MODEL || '', // optional: override the provider's default model
+  TUTOR_API_URL: process.env.TUTOR_API_URL || '', // optional: override the endpoint (used by tests)
+  TUTOR_DAILY_LIMIT: Number(process.env.TUTOR_DAILY_LIMIT) || 40, // messages per student per IST day
   SESSION_DAYS: 30,
 };

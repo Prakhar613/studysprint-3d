@@ -4,6 +4,7 @@ import * as pomo from './pomodoro.js';
 import { t, getLang, setLang, applyI18n, subjName } from './i18n.js';
 import { initFx, scan, refresh, setBackground2D } from './fx.js';
 import { initScene, THEME_ORDER } from './scene3d.js';
+import { initTutorDock } from './tutor.js';
 
 // ---- colour theme (ember / aurora / nebula) and the 3D world ----
 let scene = null;
@@ -26,7 +27,7 @@ const ROUTES = [
   ['', 'home'], ['focus', 'focus'], ['quiz', 'quiz'], ['quiz/play/:id', 'play'],
   ['contests', 'contests'], ['contest/:id', 'contest'], ['leaderboard', 'leaderboard'],
   ['chat', 'chat'], ['chat/:room', 'chat'], ['doubts', 'doubts'], ['doubts/:id', 'doubt'],
-  ['research', 'research'], ['library', 'library'], ['me', 'me'],
+  ['research', 'research'], ['library', 'library'], ['me', 'me'], ['tutor', 'tutor'],
 ].map(([path, page]) => {
   const keys = [];
   const re = new RegExp('^' + path.replace(/:([a-z]+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
@@ -48,6 +49,9 @@ async function route() {
   cleanups = [];
   const { path, query } = parse();
   document.body.classList.toggle('route-home', path === '');
+  document.body.classList.toggle('route-tutor', path === 'tutor');
+  // Scored quizzes and contests: no tutor button on screen while a student is playing.
+  document.body.classList.toggle('route-play', /^(quiz\/play|contest\/)/.test(path));
   const hit = ROUTES.map((r) => ({ r, m: r.re.exec(path) })).find((x) => x.m);
   const ctx = {
     query,
@@ -133,6 +137,7 @@ async function boot() {
     scene.setRoute(parse().path === '');
   }).catch(() => { /* keep the 2D background */ });
   await loadMe();
+  initTutorDock();
   pomo.subscribe(renderPill);
   renderPill();
   window.addEventListener('hashchange', route);

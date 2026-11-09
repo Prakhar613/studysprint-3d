@@ -12,7 +12,7 @@ function createServer() {
   bank.seedLocal();
 
   const router = createRouter();
-  for (const name of ['auth', 'quiz', 'contests', 'progress', 'community', 'chat', 'content']) {
+  for (const name of ['auth', 'quiz', 'contests', 'progress', 'community', 'chat', 'content', 'tutor']) {
     require(`./src/routes/${name}`).register(router);
   }
   const handler = createHandler(router, {

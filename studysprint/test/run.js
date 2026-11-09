@@ -453,3 +453,206 @@ describe('api', () => {
     assert.equal((await fetch(base + '/nope.txt')).status, 404);
   });
 });
+
+describe('ai tutor', () => {
+  const http = require('node:http');
+  const config = require('../src/config');
+  let mock;
+  let seen = [];
+  const accounts = {};
+  const user = async (name) => (accounts[name] ??= await signup(name)); // sign-ups are rate limited, so reuse accounts
+
+  const sse = (res, parts, stop = 'end_turn') => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.write('event: message_start\ndata: {"type":"message_start"}\n\n');
+    for (const p of parts) res.write(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: p } })}\n\n`);
+    res.write(`event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: stop } })}\n\n`);
+    res.end('event: message_stop\ndata: {"type":"message_stop"}\n\n');
+  };
+  const readAll = async (res) => {
+    const text = await res.text();
+    const frames = text.split('\n\n').filter((f) => f.startsWith('data:')).map((f) => JSON.parse(f.slice(5)));
+    return { frames, text: frames.filter((f) => f.t).map((f) => f.t).join(''), done: frames.find((f) => f.done), error: frames.find((f) => f.error) };
+  };
+  const chat = (c, body) => c('POST', '/api/tutor/chat', body);
+  // The shared test client parses JSON; for the stream we call fetch directly with the session cookie.
+  const stream = (c, body) => fetch(base + '/api/tutor/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: c.cookie() }, body: JSON.stringify(body) });
+
+  before(async () => {
+    mock = http.createServer((req, res) => {
+      let raw = '';
+      req.on('data', (d) => { raw += d; });
+      req.on('end', () => {
+        const body = JSON.parse(raw);
+        seen.push({ headers: req.headers, body });
+        if (config.__mockStatus) { res.writeHead(config.__mockStatus); return res.end('{"error":"x"}'); }
+        if (req.headers.authorization) { // OpenAI-style providers (Groq, Gemini, OpenRouter)
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          for (const p of ['Hello ', '**student**!']) res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: p } }] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: config.__mockStop ? 'length' : 'stop' }] })}\n\n`);
+          return res.end('data: [DONE]\n\n');
+        }
+        sse(res, ['Hello ', '**student**!'], config.__mockStop);
+      });
+    });
+    await new Promise((r) => mock.listen(0, '127.0.0.1', r));
+    config.TUTOR_API_URL = `http://127.0.0.1:${mock.address().port}/v1/messages`;
+  });
+  after(() => { mock.closeAllConnections?.(); mock.close(); for (const k of ['ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GEMINI_API_KEY', 'TUTOR_PROVIDER']) config[k] = ''; });
+
+  test('status is public and reports whether the tutor is switched on', async () => {
+    config.ANTHROPIC_API_KEY = '';
+    const s = await client()('GET', '/api/tutor/status');
+    assert.equal(s.status, 200);
+    assert.equal(s.data.enabled, false);
+    assert.equal(s.data.left, null);
+  });
+
+  test('login is required, and the tutor can be off', async () => {
+    assert.equal((await chat(client(), { messages: [{ role: 'user', content: 'hi' }] })).status, 401);
+    const c = await user('zqalpha');
+    assert.equal((await chat(c, { messages: [{ role: 'user', content: 'hi' }] })).status, 503);
+  });
+
+  test('streams a reply, sends the right request upstream and masks contact details', async () => {
+    config.ANTHROPIC_API_KEY = 'sk-test';
+    seen = [];
+    const c = await user('zqalpha');
+    const res = await stream(c, {
+      messages: [{ role: 'user', content: 'Explain Ohm law. Call me on 9876543210 or a@b.com' }],
+      mode: 'explain', lang: 'hi', subject: 'physics', pomodoro: { phase: 'focus', minutesLeft: 12 },
+    });
+    assert.equal(res.status, 200);
+    assert.ok(res.headers.get('content-type').startsWith('text/event-stream'));
+    const out = await readAll(res);
+    assert.equal(out.text, 'Hello **student**!');
+    assert.ok(out.done && out.done.left === config.TUTOR_DAILY_LIMIT - 1);
+
+    const up = seen[0];
+    assert.equal(up.headers['x-api-key'], 'sk-test');
+    assert.equal(up.body.model, 'claude-sonnet-5-5');
+    assert.equal(up.body.stream, true);
+    assert.match(up.body.system, /Sprint/);
+    assert.match(up.body.system, /Devanagari/);
+    assert.match(up.body.system, /Subject the student is on: Physics/);
+    assert.match(up.body.system, /Class 12/);
+    assert.match(up.body.system, /about 12 minutes left/);
+    assert.doesNotMatch(up.body.system, /zqalpha/); // the username is never sent
+    const sent = up.body.messages[up.body.messages.length - 1].content;
+    assert.match(sent, /\[number hidden\]/);
+    assert.match(sent, /\[email hidden\]/);
+    assert.doesNotMatch(sent, /9876543210/);
+  });
+
+  test('validates input and ignores unknown modes, languages and subjects', async () => {
+    config.ANTHROPIC_API_KEY = 'sk-test';
+    const c = await user('zqbeta');
+    assert.equal((await chat(c, {})).status, 400);
+    assert.equal((await chat(c, { messages: [] })).status, 400);
+    assert.equal((await chat(c, { messages: [{ role: 'assistant', content: 'hi' }] })).status, 400);
+    assert.equal((await chat(c, { messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] })).status, 400);
+    seen = [];
+    const res = await stream(c, { messages: [{ role: 'user', content: 'hello' }], mode: 'hack', lang: 'xx', subject: 'alchemy' });
+    await readAll(res);
+    assert.doesNotMatch(seen[0].body.system, /Mode:|Subject the student is on/);
+    assert.match(seen[0].body.system, /language the student writes in/);
+  });
+
+  test('review-my-mistakes mode includes the student\'s own wrong answers', async () => {
+    config.ANTHROPIC_API_KEY = 'sk-test';
+    const c = await user('zqgamma');
+    const uid = db.prepare("SELECT id FROM users WHERE username = 'zqgamma'").get().id;
+    const q = db.prepare("SELECT id FROM questions WHERE subject = 'physics' LIMIT 1").get();
+    const now = Date.now();
+    const at = db.prepare("INSERT INTO attempts(user_id, subject, mode, seconds_per, plan, idx, q_started_at, started_at, finished_at) VALUES(?,?,?,?,?,?,?,?,?)")
+      .run(uid, 'physics', 'quiz', 20, '[]', 1, now, now, now);
+    db.prepare('INSERT INTO answers(attempt_id, user_id, subject, mode, question_id, correct, points, ms, created_at) VALUES(?,?,?,?,?,?,?,?,?)')
+      .run(Number(at.lastInsertRowid), uid, 'physics', 'quiz', q.id, 0, 0, 5000, now);
+    seen = [];
+    await readAll(await stream(c, { messages: [{ role: 'user', content: 'review' }], mode: 'mistakes' }));
+    assert.match(seen[0].body.system, /Student snapshot/);
+    assert.match(seen[0].body.system, /\[physics\]/);
+    assert.match(seen[0].body.system, /Correct answer:/);
+    // other modes never get the snapshot
+    seen = [];
+    await readAll(await stream(c, { messages: [{ role: 'user', content: 'hi' }], mode: 'explain' }));
+    assert.doesNotMatch(seen[0].body.system, /Student snapshot/);
+  });
+
+  test('sits out while a quiz is running, then helps again once it is finished', async () => {
+    config.ANTHROPIC_API_KEY = 'sk-test';
+    const c = await user('zqgamma');
+    const start = await c('POST', '/api/quiz/start', { subject: 'physics', count: 5, seconds: 20 });
+    assert.equal(start.status, 201, JSON.stringify(start.data));
+    const blocked = await chat(c, { messages: [{ role: 'user', content: 'what is the answer?' }] });
+    assert.equal(blocked.status, 409);
+    db.prepare('UPDATE attempts SET finished_at = ? WHERE user_id = (SELECT id FROM users WHERE username = ?)').run(Date.now(), 'zqgamma');
+    const ok = await stream(c, { messages: [{ role: 'user', content: 'explain it now' }] });
+    assert.equal(ok.status, 200);
+    await readAll(ok);
+  });
+
+  test('daily allowance and upstream failures are reported cleanly', async () => {
+    config.ANTHROPIC_API_KEY = 'sk-test';
+    const c = await user('zqdelta');
+    const old = config.TUTOR_DAILY_LIMIT;
+    config.TUTOR_DAILY_LIMIT = 1;
+    await readAll(await stream(c, { messages: [{ role: 'user', content: 'one' }] }));
+    const over = await chat(c, { messages: [{ role: 'user', content: 'two' }] });
+    assert.equal(over.status, 429);
+    assert.match(over.data.error, /midnight IST/);
+    assert.equal((await c('GET', '/api/tutor/status')).data.left, 0);
+    config.TUTOR_DAILY_LIMIT = old;
+
+    const d = c;
+    config.__mockStatus = 529;
+    const res = await stream(d, { messages: [{ role: 'user', content: 'hello' }] });
+    const out = await readAll(res);
+    config.__mockStatus = 0;
+    assert.match(out.error.error, /busy/);
+
+    const e = c;
+    config.__mockStop = 'max_tokens';
+    const cut = await readAll(await stream(e, { messages: [{ role: 'user', content: 'long please' }] }));
+    config.__mockStop = undefined;
+    assert.equal(cut.done.truncated, true);
+  });
+
+  test('works with free OpenAI-style providers (Groq by default, Gemini on request)', async () => {
+    config.ANTHROPIC_API_KEY = '';
+    config.GROQ_API_KEY = 'gsk-test';
+    seen = [];
+    const c = await user('zqalpha');
+    assert.equal((await c('GET', '/api/tutor/status')).data.enabled, true);
+    const out = await readAll(await stream(c, { messages: [{ role: 'user', content: 'hi there' }], mode: 'explain' }));
+    assert.equal(out.text, 'Hello **student**!');
+    let up = seen[0];
+    assert.equal(up.headers.authorization, 'Bearer gsk-test');
+    assert.equal(up.headers['x-api-key'], undefined);
+    assert.equal(up.body.model, 'llama-3.3-70b-versatile');
+    assert.equal(up.body.messages[0].role, 'system');
+    assert.match(up.body.messages[0].content, /Sprint/);
+    assert.equal(up.body.messages[up.body.messages.length - 1].content, 'hi there');
+
+    config.TUTOR_PROVIDER = 'gemini';
+    config.GEMINI_API_KEY = 'g-test';
+    seen = [];
+    await readAll(await stream(c, { messages: [{ role: 'user', content: 'again' }] }));
+    up = seen[0];
+    assert.equal(up.headers.authorization, 'Bearer g-test');
+    assert.match(up.body.model, /^gemini-/);
+    config.TUTOR_PROVIDER = '';
+    config.GEMINI_API_KEY = '';
+    config.GROQ_API_KEY = '';
+  });
+
+  test('front end files for the tutor are served', async () => {
+    for (const f of ['/js/tutor.js', '/js/pages/tutor.js', '/css/tutor.css']) assert.equal((await fetch(base + f)).status, 200, f);
+    const html = await (await fetch(base + '/')).text();
+    assert.match(html, /css\/tutor\.css/);
+    assert.match(html, /#\/tutor/);
+    const pp = (await fetch(base + '/')).headers.get('permissions-policy');
+    assert.match(pp, /microphone=\(self\)/); // voice typing
+    assert.match(pp, /camera=\(\)/); // the camera stays blocked
+  });
+});
